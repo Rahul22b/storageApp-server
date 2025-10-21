@@ -1,6 +1,7 @@
 [
   {
     "origin": ["https://storage22b.netlify.app"],
+    "Cross-Origin-Opener-Policy": "unsafe-none",
     "method": ["PUT"],
     "responseHeader": ["Content-Type"],
     "maxAgeSeconds": 3600
