@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch --no-deprecation --env-file=.env app.js",
-    "start" : "node --no-deprecation app.js",
+    "start": "node --no-deprecation app.js",
     "setup": "node config/setup.js",
-    "build":"node build.js"
+    "build": "npm install"
   },
   "keywords": [],
   "author": "",
