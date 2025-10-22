@@ -176,7 +176,7 @@ export const logoutAll = async (req, res) => {
     "userIdIdx",
     `@userId:{${session.userId}}`,
     {
-      RETURN: [],
+      RETURN: ["__$key"], 
     }
   );
 
