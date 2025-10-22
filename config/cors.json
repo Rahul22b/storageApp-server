@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["https://storage22b.netlify.app"],
+    "origin": ["https://storage22b.netlify.app","https://storage.googleapis.com"],
     "Cross-Origin-Opener-Policy": "unsafe-none",
     "method": ["PUT"],
     "responseHeader": ["Content-Type"],
