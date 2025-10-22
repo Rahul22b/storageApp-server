@@ -171,12 +171,25 @@ export const logoutById = async (req, res, next) => {
 
 export const logoutAll = async (req, res) => {
   const { sid } = req.signedCookies;
+  
+  // 1. Attempt to retrieve the session
   const session = await redisClient.json.get(`session:${sid}`);
+
+  // 2. CHECK FOR NULL/UNDEFINED SESSION 🛑
+  if (!session || !session.userId) {
+    // If the session is null, or the userId is missing, 
+    // the user is effectively already logged out or the session is invalid.
+    return res.status(204).end(); // Send success/no-content as session cleanup is done
+    // Alternatively, send a 401/403 if you prefer an error:
+    // return res.status(401).send({ error: "Invalid session." });
+  }
+
+  // 3. Proceed with search and deletion only if userId is valid
   const allSessions = await redisClient.ft.search(
     "userIdIdx",
     `@userId:{${session.userId}}`,
     {
-      RETURN: ["__$key"], 
+      RETURN: ["__$key"],
     }
   );
 
@@ -184,11 +197,10 @@ export const logoutAll = async (req, res) => {
   console.log(keysToDelete);
 
   if (keysToDelete.length > 0) {
-    await redisClient.del(keysToDelete);
+    // Use del or unlink for efficient bulk deletion
+    await redisClient.del(keysToDelete); 
   }
   
-  // await redisClient.del(allSessions.documents.map(({ id }) => id));
- 
   res.status(204).end();
 };
 
