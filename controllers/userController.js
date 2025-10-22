@@ -179,13 +179,9 @@ export const logoutAll = async (req, res) => {
       RETURN: [],
     }
   );
-  const sessionKeysToDelete = allSessions.documents.map(({ id }) => id);
-  // await redisClient.del(allSessions.documents.map(({ id }) => id));
-  if (sessionKeysToDelete.length > 0) {
-    // UNLINK is preferred over DEL for non-blocking key deletion.
-    // It accepts an array of keys.
-    await redisClient.unlink(sessionKeysToDelete);
-  }
+  
+  await redisClient.del(allSessions.documents.map(({ id }) => id));
+ 
   res.status(204).end();
 };
 
