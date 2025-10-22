@@ -179,8 +179,15 @@ export const logoutAll = async (req, res) => {
       RETURN: [],
     }
   );
+
+  const keysToDelete = allSessions.documents.map(({ id }) => id);
+  console.log(keysToDelete);
+
+  if (keysToDelete.length > 0) {
+    await redisClient.del(keysToDelete);
+  }
   
-  await redisClient.del(allSessions.documents.map(({ id }) => id));
+  // await redisClient.del(allSessions.documents.map(({ id }) => id));
  
   res.status(204).end();
 };
