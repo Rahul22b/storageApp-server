@@ -1,9 +1,8 @@
 [
   {
-    "origin": ["https://storage22b.netlify.app","https://storage.googleapis.com"],
-    "Cross-Origin-Opener-Policy": "unsafe-none",
-    "method": ["PUT"],
-    "responseHeader": ["Content-Type"],
+    "origin": ["https://storage22b.netlify.app", "http://localhost:3000"],
+    "method": ["GET", "PUT", "OPTIONS"],
+    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"],
     "maxAgeSeconds": 3600
   }
 ]
