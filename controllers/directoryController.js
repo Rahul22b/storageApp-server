@@ -29,7 +29,9 @@ export const createDirectory = async (req, res, next) => {
   const user = req.user;
 
   const parentDirId = req.params.parentDirId || user.rootDirId.toString();
-  const dirname = req.headers.dirname || "New Folder";
+  // console.log(parentDirId);
+  // const dirname = req.headers.dirname || "New Folder";
+  const dirname=req.body.dirname || "new Folder"
   try {
     const parentDir = await Directory.findOne({
       _id: parentDirId,
@@ -40,11 +42,27 @@ export const createDirectory = async (req, res, next) => {
         .status(404)
         .json({ message: "Parent Directory Does not exist!" });
 
-    await Directory.insertOne({
-      name: dirname,
-      parentDirId,
-      userId: user._id,
-    });
+  //  const newDirectory= await Directory.insertOne({
+  //     name: dirname,
+  //     parentDirId,
+  //     userId: user._id,
+  //   });
+  const newDirectory = await Directory.create({
+      name: dirname,
+      parentDirId,
+      userId: user._id,
+    });
+
+    const data=newDirectory.toObject();
+
+   const clientPayload = {
+      ...data,
+      id: data._id.toString(), // Map _id to id (Client's preferred key)
+      // Ensure these fields exist if they aren't defaulted by the toObject() result
+      files: data.files || [], 
+      directories: data.directories || [],
+      size: data.size || 0,
+    };
 
     return res.status(201).json({ message: "Directory Created!" });
   } catch (err) {
