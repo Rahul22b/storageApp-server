@@ -37,7 +37,10 @@ app.use((err, req, res, next) => {
   res.json(err);
 });
 
-app.listen(PORT, () => {
+const host=process.env.HOST;
+
+
+app.listen(PORT,host, () => {
   console.log(`Server Started`);
 });
 
