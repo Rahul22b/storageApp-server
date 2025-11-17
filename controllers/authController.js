@@ -9,6 +9,15 @@ import { otpSchema } from "../validators/authSchema.js";
 
 export const sendOtp = async (req, res, next) => {
   const { email } = req.body;
+  
+  const existingUser = await User.findOne({ email: email }).select('email');
+
+  // *CORRECTED LOGIC*: Check if the email *ALREADY EXISTS* in the database.
+  if (existingUser) {
+    // If a user is found (i.e., email already exists), return an error.
+    return res.status(409).json({ error: "Email already registered. Please log in." });
+    // Use status 409 (Conflict) as it's more appropriate than a generic 400 or 500.
+  }
   const resData = await sendOtpService(email);
   res.status(201).json(resData);
 };
