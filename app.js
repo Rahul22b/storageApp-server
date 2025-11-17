@@ -22,6 +22,8 @@ app.use(
   })
 );
 
+app.options('*', cors());
+
 app.get("/",(req,res)=>{
 return res.status(200).json({"message":"welcome to storage App"})
 })
