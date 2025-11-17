@@ -1,16 +1,3 @@
-// import { createClient } from "redis";
-
-// const redisClient = createClient();
-
-// redisClient.on("error", (err) => {
-//   console.log("Redis Client Error", err);
-//   process.exit(1);
-// });
-
-// await redisClient.connect();
-
-// export default redisClient;
-
 
 import { createClient } from 'redis';
 
@@ -26,10 +13,7 @@ const client = createClient({
 client.on('error', err => console.log('Redis Client Error', err));
 
 await client.connect();
-
-await client.set('foo', 'bar');
-const result = await client.get('foo');
-console.log(result)  // >>> bar
+console.log("redis connected")  // >>> bar
 
 
 

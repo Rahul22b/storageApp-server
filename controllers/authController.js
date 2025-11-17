@@ -1,5 +1,5 @@
 import mongoose, { Types } from "mongoose";
-import OTP from "../models/otpModel.js";
+import crypto from 'crypto';
 import User from "../models/userModel.js";
 import Directory from "../models/directoryModel.js";
 import { verifyIdToken } from "../services/googleAuthService.js";
@@ -13,24 +13,73 @@ export const sendOtp = async (req, res, next) => {
   res.status(201).json(resData);
 };
 
+ // Ensure you import crypto if you're using Node.js
+
 export const verifyOtp = async (req, res, next) => {
   const { success, data } = otpSchema.safeParse(req.body);
 
-  console.log(req.body);
-  console.log(data);
-
   if (!success) {
-    return res.status(400).json({ error: "Invalid OTP" });
+    return res.status(400).json({ error: "Invalid input data for OTP verification." });
   }
 
   const { email, otp } = data;
-  const otpRecord = await OTP.findOne({ email, otp });
+  const key = `otp:${email}`;
+  const TokenExpiryTimeMs = 5 * 60 * 1000; // 5 minutes in milliseconds
+  const TokenExpiryTimeSec = 5 * 60;        // 5 minutes in seconds (for Redis)
 
-  if (!otpRecord) {
-    return res.status(400).json({ error: "Invalid or Expired OTP!" });
+  try {
+    // 1. Retrieve the JSON string from Redis
+    const otpRecordString = await redisClient.json.get(key);
+    
+    // Check 1: Key Existence (Handles Expiration)
+    if (!otpRecordString) {
+      return res.status(400).json({ error: "Invalid or Expired OTP!" });
+    }
+
+    // 2. Parse the stored JSON object
+    // const otpRecord = JSON.parse(otpRecordString);
+
+    // Check 2: OTP Match
+    if (otpRecordString.otp !== otp) {
+      // It is good practice to delete the OTP after an incorrect attempt, 
+      // but for simplicity, we'll leave it to expire or be deleted on success.
+      return res.status(400).json({ error: "Invalid OTP!" });
+    }
+
+    // --- Success: Generate Verification Proof ---
+    
+    // 3. Generate a unique, random verification ID
+    const verificationId = crypto.randomUUID(); 
+    
+    // 4. Store the verification ID (key) with the user's email (value) in Redis
+    // Key: verify_id:<uuid> | Value: <email>
+    const verificationKey = `verify_id:${verificationId}`;
+
+    // *CORRECTION*: Use SET command with EX option for simple key-value storage and TTL.
+    await redisClient.set(verificationKey, email, {
+      EX: TokenExpiryTimeSec // Set the expiration time in SECONDS
+    });
+
+    // 5. Delete the used OTP key from Redis (Crucial for one-time use)
+    await redisClient.del(key); 
+
+    // 6. Set the unique ID as a Signed, HTTP-Only Cookie
+    res.cookie('verification_proof', verificationId, {
+      httpOnly: true,
+      signed: true,
+      secure:true, 
+      sameSite: "none",
+      maxAge: TokenExpiryTimeMs, // MaxAge must be in MILLISECONDS for cookies
+    });
+    
+
+    return res.json({ message: "OTP Verified! Proceed to registration." });
+
+  } catch (error) {
+    console.error("Redis verification error:", error);
+    // Be sure to handle potential JSON parsing errors here too
+    return res.status(500).json({ error: "Server error during verification." });
   }
-
-  return res.json({ message: "OTP Verified!" });
 };
 
 export const loginWithGoogle = async (req, res, next) => {

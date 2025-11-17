@@ -1,17 +1,33 @@
 import { Resend } from "resend";
-import OTP from "../models/otpModel.js";
+import  redisClient from '../config/redis.js'
+
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendOtpService(email) {
   const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
-  // Upsert OTP (replace if it already exists)
-  await OTP.findOneAndUpdate(
-    { email },
-    { otp, createdAt: new Date() },
-    { upsert: true }
-  );
+  
+
+// Define the key for the Hash (a good practice is to namespace it)
+const key = `otp:${email}`;
+ // Store the creation time as an ISO string
+const expirationTimeInSeconds = 10 * 60; // 10 minutes
+
+try {
+  // Step 1: Store the multiple fields (otp and createdAt) under the key
+await redisClient.json.set(key, '$', { 
+      otp: otp,
+    });
+
+
+  await redisClient.expire(key, expirationTimeInSeconds);
+  
+  console.log(`OTP stored for ${email} with a 10-minute TTL.`);
+
+} catch (error) {
+  console.error("Redis HSET/EXPIRE operation failed:", error);
+}
 
 
 
