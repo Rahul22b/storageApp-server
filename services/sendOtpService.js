@@ -13,47 +13,90 @@ export async function sendOtpService(email) {
     { upsert: true }
   );
 
-  // const html = `
-  //   <div style="font-family:sans-serif;">
-  //     <h2>Your OTP is: ${otp}</h2>
-  //     <p>This OTP is valid for 10 minutes.</p>
-  //   </div>
-  // `;
 
-  const html = `
-  <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f7f6; padding: 40px 20px; text-align: center;">
-    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 550px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);">
-      <tr>
-        <td style="padding: 40px 30px;">
-          <h1 style="color: #333333; font-size: 26px; margin-bottom: 20px; border-bottom: 2px solid #007bff; display: inline-block; padding-bottom: 5px;">
-            Storage App Security
-          </h1>
 
-          <p style="color: #555555; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
-            Use the following One-Time Password (OTP) to complete your login or verification process.
-          </p>
+const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #000000;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td style="padding: 40px 20px;">
+        
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; background-color: #1a1a1a; border-radius: 16px; border: 1px solid #2a2a2a;">
           
-          <div style="background-color: #e6f0ff; border: 1px solid #007bff; border-radius: 8px; padding: 20px; margin: 30px auto; max-width: 300px;">
-            <p style="color: #007bff; font-size: 14px; margin: 0 0 10px 0; text-transform: uppercase;">
-              Your One-Time Password
-            </p>
-            <h2 style="color: #1a1a1a; font-size: 38px; font-weight: 700; letter-spacing: 5px; margin: 0;">
-              ${otp}
-            </h2>
-          </div>
+          <!-- Header -->
+          <tr>
+            <td style="padding: 48px 40px 32px; text-align: center;">
+              <h1 style="color: #ffffff; font-size: 28px; font-weight: 600; margin: 0 0 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Storage App
+              </h1>
+              <p style="color: #9ca3af; font-size: 15px; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Your verification code is ready
+              </p>
+            </td>
+          </tr>
           
-          <p style="color: #999999; font-size: 14px; margin-top: 20px;">
-            This OTP is valid for **10 minutes** only. For security reasons, please do not share this code.
-          </p>
-
-          <p style="color: #777777; font-size: 12px; margin-top: 40px; border-top: 1px solid #eeeeee; padding-top: 20px;">
-            If you did not request this code, please ignore this email.
-          </p>
-        </td>
-      </tr>
-    </table>
-  </div>
+          <!-- OTP Section -->
+          <tr>
+            <td style="padding: 0 40px 32px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="text-align: center;">
+                    <div style="background-color: #0a0a0a; border: 2px solid #2a2a2a; border-radius: 12px; padding: 32px 24px;">
+                      <p style="color: #6b7280; font-size: 13px; font-weight: 500; margin: 0 0 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Verification Code
+                      </p>
+                      <h2 style="color: #ffffff; font-size: 48px; font-weight: 700; letter-spacing: 8px; margin: 0; font-family: 'Courier New', monospace;">
+                        ${otp}
+                      </h2>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="color: #6b7280; font-size: 14px; margin: 20px 0 0; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                This code expires in <strong style="color: #9ca3af;">10 minutes</strong>
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Info Section -->
+          <tr>
+            <td style="padding: 0 40px 40px;">
+              <div style="background-color: #2a2a2a; border-left: 3px solid #f59e0b; border-radius: 8px; padding: 16px 20px;">
+                <p style="color: #d1d5db; font-size: 13px; line-height: 1.5; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  <strong style="color: #ffffff;">Security reminder:</strong> Never share this code with anyone. Storage App will never ask for your code.
+                </p>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 32px 40px; border-top: 1px solid #2a2a2a; text-align: center;">
+              <p style="color: #6b7280; font-size: 13px; margin: 0 0 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Didn't request this? You can safely ignore this email.
+              </p>
+              <p style="color: #4b5563; font-size: 12px; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                © ${new Date().getFullYear()} Storage App
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+        
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
 `;
+
 
   await resend.emails.send({
     from: "Storage App <otp@storage22b.space>",
