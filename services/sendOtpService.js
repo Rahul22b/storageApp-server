@@ -21,7 +21,7 @@ export async function sendOtpService(email) {
   `;
 
   await resend.emails.send({
-    from: "Storage App <otp@procodrr.dev>",
+    from: "Storage App <otp@storage22b.space>",
     to: email,
     subject: "Storage App OTP",
     html,
