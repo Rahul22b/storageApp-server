@@ -17,7 +17,7 @@ export const register = async (req, res, next) => {
       return res.status(400).json({error:"email not verified"});
     }
     const verificationKey = `verify_id:${verificationId}`;
-    const verifiedemail=await redisClient.get(verificationId);
+    const verifiedemail=await redisClient.get(verificationKey);
 
     if(!verifiedemail){
       return res.status(400).json({error:"email not verified"});
