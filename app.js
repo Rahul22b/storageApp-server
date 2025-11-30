@@ -36,7 +36,7 @@ app.use("/subscription", subscriptionRoutes);
 
 app.use((err, req, res, next) => {
   console.log(err);
-  res.json(err);
+  res.status(500).json({ error: "Internal Server Error" });
 });
 
 const host=process.env.HOST;

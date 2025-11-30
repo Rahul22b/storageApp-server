@@ -12,17 +12,23 @@ export const register = async (req, res, next) => {
     return res.status(400).json({ error: z.flattenError(error).fieldErrors.name });
   }
 
-    const verificationId=req.signedCookies.verification_proof;
-    if(!verificationId){
-      return res.status(400).json({error:"email not verified"});
+   try{
+     const d=await redisClient.json.get(`otp:${data.email}`); //object
+    if(!d){
+      return res.status(400).json({error:"OTP expired or not found"});
     }
-    const verificationKey = `verify_id:${verificationId}`;
-    const d=await redisClient.get(verificationKey);
-    const verifiedemail=JSON.parse(d);
-    if(!verifiedemail && verifiedemail!=data.email){
-      return res.status(400).json({error:"email not verified"});
-    } 
+    const  storedOtp  = d.otp;
 
+    if(storedOtp!==data.otp){
+      return res.status(400).json({error:"Invalid OTP"});
+    }
+
+   }
+   catch(err){
+     console.error("Error fetching OTP from Redis:", err);
+     next(err);
+     return;
+   }
   const { name, email, password} = data;
 
   const session = await mongoose.startSession();
