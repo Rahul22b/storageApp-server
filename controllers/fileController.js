@@ -188,6 +188,7 @@ export const softDeleteFile = async (req, res, next) => {
     
     await updateDirectoriesSize(file.parentDirId, -file.size);
    const [response] = await storage.bucket('chiku22b').file(`${file.id}${file.extension}`).delete();
+   console.log(response);
    await File.updateOne({_id:id},{gcsGeneration:response.generation});
     return res.status(200).json({ message: "File Deleted Successfully" });
   } catch (err) {
