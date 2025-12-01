@@ -110,6 +110,7 @@ export const getFile = async (req, res) => {
     const fileData = await File.findOne({
         _id: id,
         userId: req.user._id,
+        
     }).lean();
 
     if (!fileData) {
@@ -153,6 +154,7 @@ export const renameFile = async (req, res, next) => {
 };
 
 export const deleteFile = async (req, res, next) => {
+
   const { id } = req.params;
   const file = await File.findOne({
     _id: id,
@@ -165,13 +167,54 @@ export const deleteFile = async (req, res, next) => {
 
   try {
     await file.deleteOne();
-    await updateDirectoriesSize(file.parentDirId, -file.size);
-    await storage.bucket('chiku22b').file(`${file.id}${file.extension}`).delete();
     return res.status(200).json({ message: "File Deleted Successfully" });
   } catch (err) {
     next(err);
   }
 };
+
+export const softDeleteFile = async (req, res, next) => {
+   const { id } = req.params;
+  const file = await File.findOne({
+    _id: id,
+    userId: req.user._id,
+  });
+  // Check if file exists
+  if (!file) {
+    return res.status(404).json({ error: "File not found!" });
+  }
+
+    try {
+    // await file.deleteOne();
+    await File.updateOne({_id:id},{deletedAt:new Date()});
+    await updateDirectoriesSize(file.parentDirId, -file.size);
+    await storage.bucket('chiku22b').file(`${file.id}${file.extension}`).delete();
+    return res.status(200).json({ message: "File Deleted Successfully" });
+  } catch (err) {
+    next(err); 
+  }
+}
+
+export const restoreFile=async (req,res,next)=>{
+  const { id } = req.params;
+  const file = await File.findOne({
+    _id: id,
+    userId: req.user._id,
+  });
+
+  // Check if file exists
+  if (!file) {
+    return res.status(404).json({ error: "File not found!" });
+  }
+
+  try {
+    await File.updateOne({ _id: id }, { deletedAt: null });
+    await storage.bucket('chiku22b').file(`${file.id}${file.extension}`).restore();
+    return res.status(200).json({ message: "File Restored Successfully" });
+  } catch (err) {
+    next(err);
+  }
+}
 
 export const checkfileupload=async (req,res,next)=>{ 
 const file=await File.findById(req.body.fileId);

@@ -22,7 +22,12 @@ const fileSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Directory",
     },
+     deletedAt: {
+      type: Schema.Types.Date,
+      default: null,
+    },
   },
+  
   {
     strict: "throw",
     timestamps: true,
