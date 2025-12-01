@@ -26,6 +26,7 @@ const fileSchema = new Schema(
       type: Schema.Types.Date,
       default: null,
     },
+    gcsGeneration: { type: String, default: null }
   },
   
   {

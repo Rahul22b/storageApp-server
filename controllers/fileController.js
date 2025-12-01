@@ -185,10 +185,10 @@ export const softDeleteFile = async (req, res, next) => {
   }
 
     try {
-    // await file.deleteOne();
-    await File.updateOne({_id:id},{deletedAt:new Date()});
+    
     await updateDirectoriesSize(file.parentDirId, -file.size);
-    await storage.bucket('chiku22b').file(`${file.id}${file.extension}`).delete();
+   const [response] = await storage.bucket('chiku22b').file(`${file.id}${file.extension}`).delete();
+   await File.updateOne({_id:id},{gcsGeneration:response.generation});
     return res.status(200).json({ message: "File Deleted Successfully" });
   } catch (err) {
     next(err); 
@@ -209,7 +209,7 @@ export const restoreFile=async (req,res,next)=>{
 
   try {
     await File.updateOne({ _id: id }, { deletedAt: null });
-    await storage.bucket('chiku22b').file(`${file.id}${file.extension}`).restore();
+    await storage.bucket('chiku22b').file(`${file.id}${file.extension}`,{ generation: file.gcsGeneration }).restore();
     return res.status(200).json({ message: "File Restored Successfully" });
   } catch (err) {
     next(err);
