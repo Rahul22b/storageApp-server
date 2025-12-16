@@ -38,20 +38,6 @@ const fileSchema = new Schema(
     deletedAt: {
       type: Schema.Types.Date,
       default: null,
-    },
-    gcsGeneration: { 
-      type: String, 
-      default: null,
-      validate: {
-        // Only allow gcsGeneration to be set if the file is marked as deleted
-        validator: function(v) {
-          if (v && this.deletedAt === null) {
-            return false;
-          }
-          return true;
-        },
-        message: 'gcsGeneration can only be set when deletedAt is not null.'
-      }
     }
   },
   {
