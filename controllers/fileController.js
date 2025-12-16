@@ -8,6 +8,7 @@ import {
   deleteS3Object,
   getFileContentLength,
   restoreS3Object,
+  softDeleteS3Object
 } from "../services/awsService.js";
 
 export async function updateDirectoriesSize(parentId, deltaSize) {
@@ -90,7 +91,7 @@ export const getFile = async (req, res) => {
     return res.status(404).json({ error: "File not found!" });
   }
 
-  const filePath = `${id}${fileData.extension}`;
+  const filePath = `uploads/active/${id}${fileData.extension}`;
 
   const url = await generatePreSigendGetURL(
    { Key: filePath,
