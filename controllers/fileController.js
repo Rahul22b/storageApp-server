@@ -170,12 +170,14 @@ export const restoreFile = async (req, res, next) => {
 };
 
 export const checkfileupload = async (req, res, next) => {
-  const file = await File.findById(req.body.fileId);
+
+  try{
+     const file = await File.findById(req.body.fileId);
   if (!file) {
     return res.json({ error: "file not found at pur record" });
   }
   const contentLength = await getFileContentLength(
-    `${file.id}${file.extension}`
+    { Key: `${file.id}${file.extension}` }
   );
   if (contentLength != file.size) {
     req.params = { id: file.id };
@@ -185,4 +187,8 @@ export const checkfileupload = async (req, res, next) => {
   await updateDirectoriesSize(file.parentDirId, parseInt(contentLength));
 
   return res.status(200).json({ message: "file uploaded successfully " });
+  }
+ catch(err){ 
+    next(err);
+  }
 };
