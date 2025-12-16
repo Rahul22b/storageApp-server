@@ -7,6 +7,7 @@ import {
   generatePreSigendGetURL,
   deleteS3Object,
   getFileContentLength,
+  restoreS3Object,
 } from "../services/awsService.js";
 
 export async function updateDirectoriesSize(parentId, deltaSize) {
@@ -32,17 +33,25 @@ export const createuploadSignedUrl = async (req, res, next) => {
     }
 
     const filename = req.headers.filename || "untitled";
-    const filesize = req.headers.filesize;
+    const filesize = Number(req.headers.filesize);
     const type = req.headers.type;
+
+    if (!filesize || isNaN(filesize)) {
+      return res.status(400).json({ error: "Invalid filesize" });
+    }
+    if (!type) {
+      return res.status(400).json({ error: "Missing Content-Type" });
+    }
+
     const user = await User.findById(req.user._id);
     const rootDir = await Directory.findById(req.user.rootDirId);
     const remainingSpace = user.maxStorageInBytes - rootDir.size;
 
     if (filesize > remainingSpace) {
       console.log("File too large");
-      return res.destroy();
+      return res.status(400).json({ error: "File too large" });
     }
- 
+
     const extension = path.extname(filename);
 
     const insertedFile = await File.insertOne({
@@ -52,9 +61,11 @@ export const createuploadSignedUrl = async (req, res, next) => {
       parentDirId: parentDirData._id,
       userId: req.user._id,
     });
-    const fileId = insertedFile.id;
 
-    const fullFileName = `${fileId}${extension}`;
+    // Adjust this depending on your DB driver
+    const fileId = insertedFile.insertedId || insertedFile._id || insertedFile.id;
+
+    const fullFileName = `uploads/active/${fileId}${extension}`;
     const url = await generatePreSignedUploadURL({ Key: fullFileName, ContentType: type });
 
     res.status(200).json({
@@ -66,6 +77,7 @@ export const createuploadSignedUrl = async (req, res, next) => {
     next(err);
   }
 };
+
 
 export const getFile = async (req, res) => {
   const { id } = req.params;
@@ -136,14 +148,16 @@ export const softDeleteFile = async (req, res, next) => {
   const file = await File.findOne({
     _id: id,
     userId: req.user._id,
+    deletedAt: null,
   });
   if (!file) {
     return res.status(404).json({ error: "File not found!" });
   }
 
   try {
-    
-    await File.updateOne({ _id: id ,deletedAt: null}, { deletedAt:  new Date() });
+    file.deletedAt = new Date();
+    await file.save();
+    await softDeleteS3Object({ Key: `${file.id}${file.extension}` });
     await updateDirectoriesSize(file.parentDirId, -file.size);
     return res.status(200).json({ message: "File Deleted Successfully" });
   } catch (err) {
@@ -164,6 +178,8 @@ export const restoreFile = async (req, res, next) => {
 
   try {
     await File.updateOne({ _id: id }, { deletedAt: null });
+    await updateDirectoriesSize(file.parentDirId, file.size);
+    await restoreS3Object({ Key: `${file.id}${file.extension}` });
     return res.status(200).json({ message: "File Restored Successfully" });
   } catch (err) {
     next(err);

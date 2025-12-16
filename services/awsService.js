@@ -5,6 +5,8 @@ import {
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
+  CopyObjectCommand,
+  DeleteObjectCommand
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -80,3 +82,53 @@ export const deleteS3Objects = async ({ Keys }) => {
   const res = await s3Client.send(command);
   return res;
 };
+
+
+
+export const softDeleteS3Object = async ({ Key }) => {
+  if (!Key) throw new Error("S3 Key is required");
+
+  const sourceKey = `uploads/active/${Key}`;
+  const deletedKey = `uploads/deleted/${Key}`;
+
+  // 1️⃣ Copy object (this resets creation time)
+  await s3Client.send(
+    new CopyObjectCommand({
+      Bucket: "storag22b",
+      CopySource: `storag22b/${sourceKey}`,
+      Key: deletedKey,
+      MetadataDirective: "COPY"
+    })
+  );
+
+  // 2️⃣ Delete original
+  await s3Client.send(
+    new DeleteObjectCommand({
+      Bucket: "storag22b",
+      Key: sourceKey
+    })
+  );
+};
+
+
+export const restoreS3Object = async ({ Key }) => {
+  const deletedKey = `uploads/deleted/${Key}`;
+  const activeKey = `uploads/active/${Key}`;
+
+  await s3Client.send(
+    new CopyObjectCommand({
+      Bucket: "storag22b",
+      CopySource: `storag22b/${deletedKey}`,
+      Key: activeKey,
+      MetadataDirective: "COPY"
+    })
+  );
+
+  await s3Client.send(
+    new DeleteObjectCommand({
+      Bucket: "storag22b",
+      Key: deletedKey
+    })
+  );
+};
+
