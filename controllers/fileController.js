@@ -81,9 +81,9 @@ export const getFile = async (req, res) => {
   const filePath = `${id}${fileData.extension}`;
 
   const url = await generatePreSigendGetURL(
-    filePath,
-    req.query.action,
-    fileData.name
+   { Key: filePath,
+    Action : req.query.action,
+   Filename: fileData.name}
   );
   return res.redirect(url);
 };
