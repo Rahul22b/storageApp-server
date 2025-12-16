@@ -15,7 +15,7 @@ export const s3Client = new S3Client({
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     },});
 
-const bucket = process.env.AWS_BUCKET;
+const bucket = process.env.AWS_BUCKET_NAME;
 
 export const generatePreSignedUploadURL = async ({ Key, ContentType }) => {
   const command = new PutObjectCommand({
