@@ -42,7 +42,7 @@ export const createuploadSignedUrl = async (req, res, next) => {
       console.log("File too large");
       return res.destroy();
     }
-
+ 
     const extension = path.extname(filename);
 
     const insertedFile = await File.insertOne({
@@ -55,7 +55,7 @@ export const createuploadSignedUrl = async (req, res, next) => {
     const fileId = insertedFile.id;
 
     const fullFileName = `${fileId}${extension}`;
-    const url = await generatePreSignedUploadURL(fullFileName, type);
+    const url = await generatePreSignedUploadURL({ Key: fullFileName, ContentType: type });
 
     res.status(200).json({
       url,
