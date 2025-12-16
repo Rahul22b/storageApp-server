@@ -142,8 +142,9 @@ export const softDeleteFile = async (req, res, next) => {
   }
 
   try {
+    
+    await File.updateOne({ _id: id ,deletedAt: null}, { deletedAt:  new Date() });
     await updateDirectoriesSize(file.parentDirId, -file.size);
-    await File.updateOne({ _id: id }, { deletedAt: Date.now });
     return res.status(200).json({ message: "File Deleted Successfully" });
   } catch (err) {
     next(err);
