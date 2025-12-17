@@ -113,10 +113,8 @@ export const softDeleteDirectory = async (req, res, next) => {
 
     const { files, directories } = await getDirectoryContents(id);
 
-    // console.log(files);
-
     for (const { _id, extension } of files) {
-      // console.log(_id, extension ,"dhdj");
+
       await softDeleteS3Object({ Key: `${_id.toString()}${extension}` });
  
     } 
@@ -144,44 +142,77 @@ export const softDeleteDirectory = async (req, res, next) => {
 };
 
 export const restoreDirectory = async (req, res, next) => {
-  const {  directoryId:id } = req.params;
+  const { directoryId: id } = req.params;
 
-  const directory = await Directory.findOne({
-    _id: id,
-    userId: req.user._id,
-    deletedAt: { $ne: null },
-  });
-
-  if (!directory) {
-    return res.status(404).json({ error: "Directory not found!" });
-  }
   try {
+    const directory = await Directory.findOne({
+      _id: id,
+      userId: req.user._id,
+      deletedAt: { $ne: null },
+    });
+
+    if (!directory) {
+      return res.status(404).json({ error: "Directory not found!" });
+    }
+
+    // ✅ Parent directory must exist & not be deleted
+    if (directory.parentDirId) {
+      const parentDir = await Directory.findOne({
+        _id: directory.parentDirId,
+        userId: req.user._id,
+        deletedAt: null,
+      }).lean();
+
+      if (!parentDir) {
+        return res.status(400).json({
+          error: "Cannot restore directory as parent directory is deleted.",
+        });
+      }
+    }
+
     const { files, directories } = await getDirectoryContents(id);
-    for (const file of files) {
-      await File
-        .updateOne({ _id: file._id }, { deletedAt: null });
-    }
-    for (const dir of directories) {
-      await Directory
-        .updateOne({ _id: dir._id }, { deletedAt: null });
-    }
-    await Directory.updateOne({ _id: id }, { deletedAt: null });
 
+    // ✅ 1. Restore S3 objects FIRST
     await Promise.all(
-  files.map(file =>
-    restoreS3Object({
-      Key: `${file._id}${file.extension}`
-    })
-  )
-);
+      files.map(file =>
+        restoreS3Object({
+          Key: `${file._id}${file.extension}`,
+        })
+      )
+    );
 
+    // ✅ 2. Bulk DB restore
+    if (files.length) {
+      await File.updateMany(
+        { _id: { $in: files.map(f => f._id) } },
+        { $set: { deletedAt: null } }
+      );
+    }
 
+    if (directories.length) {
+      await Directory.updateMany(
+        { _id: { $in: directories.map(d => d._id) } },
+        { $set: { deletedAt: null } }
+      );
+    }
+
+    // Restore root directory
+    await Directory.updateOne(
+      { _id: id },
+      { $set: { deletedAt: null } }
+    );
+
+    // ✅ 3. Update parent size
     await updateDirectoriesSize(directory.parentDirId, directory.size);
-    return res.status(200).json({ message: "Directory Restored Successfully" });
+
+    return res
+      .status(200)
+      .json({ message: "Directory restored successfully" });
   } catch (err) {
     next(err);
   }
 };
+
 
 export const deleteDirectory = async (req, res, next) => {
   const { id } = req.params;

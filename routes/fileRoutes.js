@@ -12,16 +12,23 @@ import {
   softDeleteFile
   
 } from "../controllers/fileController.js";
+import User from "../models/userModel.js";
 const router = express.Router();
 router.param("parentDirId", validateIdMiddleware);
 router.param("id", validateIdMiddleware);
 
-router.get('/recycledFile',async (req,res)=>{
-  console.log(req.user._id);
+router.get('/recycledFile/:parentDirId?',async (req,res)=>{
+  // console.log("jello");
+  const parentDirId=req.params.parentDirId ||  req.user.rootDirId.toString();
   const id=req.user._id;
+ 
+  console.log(req.user._id);
+ 
+  
+
   try {
-const recycledFiles = await File.find({ userId: req.user._id, deletedAt: { $ne: null } }).lean();
-const recycledDirectory = await Directory.find({ userId: req.user._id, deletedAt: { $ne: null } }).lean();
+const recycledFiles = await File.find({ userId: req.user._id, deletedAt: { $ne: null }, parentDirId: parentDirId }).lean();
+const recycledDirectory = await Directory.find({ userId: req.user._id, deletedAt: { $ne: null }, parentDirId: parentDirId }).lean();
     res.json({ files: recycledFiles, directories: recycledDirectory });
   } catch (error) {
     console.error("Error fetching recycled files:", error);

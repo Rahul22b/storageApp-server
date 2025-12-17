@@ -177,6 +177,10 @@ export const restoreFile = async (req, res, next) => {
     return res.status(404).json({ error: "File not found!" });
   }
 
+  if(!await Directory.findOne({_id:file.parentDirId,userId:req.user._id,deletedAt:null}).lean()){
+    return  res.status(400).json({ error: "Cannot restore file as parent directory is deleted." });
+  }
+
   try {
     await File.updateOne({ _id: id }, { deletedAt: null });
     await updateDirectoriesSize(file.parentDirId, file.size);
