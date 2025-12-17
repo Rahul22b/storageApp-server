@@ -152,9 +152,10 @@ export const getAllUsers = async (req, res) => {
 };
 
 export const getCurrentUser = async (req, res) => {
-  const user = await User.findById(req.user._id).lean();
+  try{
+      const user = await User.findById(req.user._id).lean();
   const rootDir = await Directory.findById(user.rootDirId).lean();
-  res.status(200).json({
+   res.status(200).json({
     name: user.name,
     email: user.email,
     picture: user.picture,
@@ -162,6 +163,11 @@ export const getCurrentUser = async (req, res) => {
     maxStorageInBytes: user.maxStorageInBytes,
     usedStorageInBytes: rootDir.size,
   });
+  }
+  catch(err){
+    console.error("Error in getCurrentUser:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 };
 
 export const logout = async (req, res) => {

@@ -20,6 +20,10 @@ const directorySchema = new Schema(
       default: null,
       ref: "Directory",
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     strict: "throw",

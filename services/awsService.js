@@ -60,9 +60,10 @@ export const getFileContentLength = async ({ Key }) => {
 };
 
 export const deleteS3Object = async ({ Key }) => {
+  const redefinedKey = `uploads/deleted/${Key}`;
   const command = new DeleteObjectCommand({
     Bucket: bucket,
-    Key,
+    Key: redefinedKey,
   });
 
   const res = await s3Client.send(command);

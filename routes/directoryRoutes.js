@@ -6,6 +6,10 @@ import {
   deleteDirectory,
   getDirectory,
   renameDirectory,
+  restoreDirectory,
+  softDeleteDirectory,
+  
+
 } from "../controllers/directoryController.js";
 
 const router = express.Router();
@@ -19,6 +23,10 @@ router.post("/:parentDirId?", createDirectory);
 
 router.patch("/:id", renameDirectory);
 
-router.delete("/:id", deleteDirectory);
+router.delete("/:id", softDeleteDirectory);
+
+router.delete("/restore/:id", deleteDirectory);
+
+router.patch('/restore/:directoryId', restoreDirectory);
 
 export default router;
