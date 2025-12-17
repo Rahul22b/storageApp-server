@@ -136,10 +136,11 @@ export const softDeleteDirectory = async (req, res, next) => {
      directoryData.deletedAt = new Date();
      await directoryData.save();
     await updateDirectoriesSize(directoryData.parentDirId, -directoryData.size);
+    return res.json({ message: "Files deleted successfully" });
   } catch (err) {
     return next(err);
   }
-  return res.json({ message: "Files deleted successfully" });
+  
 };
 
 export const restoreDirectory = async (req, res, next) => {
