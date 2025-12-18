@@ -24,6 +24,11 @@ const directorySchema = new Schema(
       type: Date,
       default: null,
     },
+    isparentInRecycleBin: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
   },
   {
     strict: "throw",

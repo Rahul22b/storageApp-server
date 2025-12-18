@@ -78,8 +78,7 @@ export const renameDirectory = async (req, res, next) => {
 
  async function getDirectoryContents(id) {
       let files = await File.find({ parentDirId: id })
-        .select("_id extension")
-        .lean();
+        .select("_id extension deletedAt").lean();
       let directories = await Directory.find({ parentDirId: id })
         .select("_id")
         .lean();
@@ -113,25 +112,25 @@ export const softDeleteDirectory = async (req, res, next) => {
 
     const { files, directories } = await getDirectoryContents(id);
 
-    for (const { _id, extension } of files) {
 
-      await softDeleteS3Object({ Key: `${_id.toString()}${extension}` });
- 
+    for (const { _id, extension, deletedAt } of files) {
+      if(deletedAt==null){
+       await softDeleteS3Object({ Key: `${_id.toString()}${extension}` });
+      }
     } 
 
     await File.updateMany(
       { _id: { $in: files.map(({ _id }) => _id) } },
-      { deletedAt: new Date() }
+      { deletedAt: new Date(), parentInRecycleBin: true },
+
     );
 
 
     await Directory.updateMany(
       { _id: { $in: [...directories.map(({ _id }) => _id)] } },
-      { deletedAt: new Date() }
+      { deletedAt: new Date(), isparentInRecycleBin: true }
     );
-
-
-     directoryData.deletedAt = new Date();
+     directoryData.deletedAt = new Date();   
      await directoryData.save();
     await updateDirectoriesSize(directoryData.parentDirId, -directoryData.size);
     return res.json({ message: "Files deleted successfully" });
@@ -185,7 +184,7 @@ export const restoreDirectory = async (req, res, next) => {
     if (files.length) {
       await File.updateMany(
         { _id: { $in: files.map(f => f._id) } },
-        { $set: { deletedAt: null } }
+        { $set: { deletedAt: null, parentInRecycleBin: false } }
       );
     }
 

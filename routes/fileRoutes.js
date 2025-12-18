@@ -12,29 +12,47 @@ import {
   softDeleteFile
   
 } from "../controllers/fileController.js";
-import User from "../models/userModel.js";
 const router = express.Router();
 router.param("parentDirId", validateIdMiddleware);
 router.param("id", validateIdMiddleware);
 
-router.get('/recycledFile/:parentDirId?',async (req,res)=>{
-  // console.log("jello");
-  const parentDirId=req.params.parentDirId ||  req.user.rootDirId.toString();
-  const id=req.user._id;
- 
-  console.log(req.user._id);
- 
-  
-
+router.get('/recycledFile/:parentDirId?', async (req, res) => {
   try {
-const recycledFiles = await File.find({ userId: req.user._id, deletedAt: { $ne: null }, parentDirId: parentDirId }).lean();
-const recycledDirectory = await Directory.find({ userId: req.user._id, deletedAt: { $ne: null }, parentDirId: parentDirId }).lean();
-    res.json({ files: recycledFiles, directories: recycledDirectory });
+    const userId = req.user._id;
+    const rootDirId = req.user.rootDirId.toString();
+    const parentDirId = req.params.parentDirId || rootDirId;
+
+    const isRootRecycle = parentDirId === rootDirId;
+
+    // 🔥 Build file query dynamically
+    const fileQuery = {
+      userId,
+      deletedAt: { $ne: null },
+      ...(isRootRecycle
+        ? { parentInRecycleBin: false } // orphan files at root
+        : { parentDirId })
+    };
+
+    const directoryQuery = {
+      userId,
+      deletedAt: { $ne: null },
+      ...(isRootRecycle
+        ? { isparentInRecycleBin: false } // directories marked as in recycle bin at root
+        : { parentDirId })
+    };
+
+
+    const [files, directories] = await Promise.all([
+      File.find(fileQuery).lean(),
+      Directory.find(directoryQuery).lean()
+    ]);
+
+    res.json({ files, directories });
   } catch (error) {
     console.error("Error fetching recycled files:", error);
     res.status(500).json({ error: "Internal server error" });
   }
-}); 
+});
 
 
 router.get("/:id", getFile); 

@@ -35,6 +35,12 @@ const fileSchema = new Schema(
       ref: "Directory",
       default: null // Explicitly set default for clarity
     },
+
+     parentInRecycleBin: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
     deletedAt: {
       type: Schema.Types.Date,
       default: null,
