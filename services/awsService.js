@@ -1,134 +1,166 @@
 import {
+  S3Client,
+  PutObjectCommand,
+  HeadObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
-  GetObjectCommand,
-  HeadObjectCommand,
-  PutObjectCommand,
-  S3Client,
   CopyObjectCommand,
 } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import fs from "fs";
 
-export const s3Client = new S3Client({
-    region: process.env.AWS_REGION,
-    credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    },});
+import { getSignedUrl as getS3SignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getSignedUrl as getCloudFrontSignedUrl } from "@aws-sdk/cloudfront-signer";
+
+/* ============================================================
+   ENV + CLIENT SETUP
+============================================================ */
 
 const bucket = process.env.AWS_BUCKET_NAME;
+if (!bucket) throw new Error("AWS_BUCKET_NAME is missing");
 
-export const generatePreSignedUploadURL = async ({ Key, ContentType }) => {
+const CLOUDFRONT_URL = process.env.CLOUDFRONT_URL;
+if (!CLOUDFRONT_URL) throw new Error("CLOUDFRONT_URL is missing");
+
+export const s3Client = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+  //  requestChecksumCalculation: "NEVER",
+});
+
+/* ============================================================
+   CLOUD FRONT SIGNED GET URL
+============================================================ */
+
+export const generatePreSignedGetURL = ({ key }) => {
+  const cleanDomain = CLOUDFRONT_URL.replace(/\/$/, "");
+  const privateKey = fs.readFileSync("./private_key.pem", "utf8");
+
+  return getCloudFrontSignedUrl({
+    url: `${cleanDomain}/${key}`,
+    keyPairId: process.env.KEY_PAIR_ID,
+    privateKey,
+    dateLessThan: new Date(Date.now() + 60 * 60 * 1000)
+  });
+};
+
+
+/* ============================================================
+   PRESIGNED UPLOAD URL (uploads/active)
+============================================================ */
+
+export const generatePreSignedUploadURL = async ({
+  key,
+  contentType,
+}) => {
+  if (!key) throw new Error("S3 key is required");
+
   const command = new PutObjectCommand({
     Bucket: bucket,
-    Key,
-    ContentType,
+    Key: `uploads/active/${key}`,
+    ContentType: contentType,
+    // ChecksumAlgorithm: undefined,
   });
 
-  const preSignedUploadURL = await getSignedUrl(s3Client, command, {
-    expiresIn: 300,
+  return await getS3SignedUrl(s3Client, command, {
+    expiresIn: 300, // 5 minutes
     signableHeaders: new Set(["content-type"]),
   });
-  return preSignedUploadURL;
 };
 
-export const generatePreSigendGetURL = async ({ Key, Action, Filename }) => {
-  const command = new GetObjectCommand({
-    Bucket: bucket,
-    Key,
-    ResponseContentDisposition:
-      Action === "download"
-        ? `attachment; filename="${Filename}"`
-        : `inline; filename="${Filename}"`,
-  });
+/* ============================================================
+   FILE METADATA
+============================================================ */
 
-  const preSigendGetURL = await getSignedUrl(s3Client, command, {
-    expiresIn: 300,
-  });
-
-  return preSigendGetURL;
-};
-
-export const getFileContentLength = async ({ Key }) => {
+export const getFileContentLength = async ({ key }) => {
   const command = new HeadObjectCommand({
     Bucket: bucket,
-    Key,
+    Key: key,
   });
 
-  const metaData = await s3Client.send(command);
-  return metaData?.ContentLength;
+  const meta = await s3Client.send(command);
+  return meta?.ContentLength;
 };
 
-export const deleteS3Object = async ({ Key }) => {
-  const redefinedKey = `uploads/deleted/${Key}`;
+/* ============================================================
+   HARD DELETE
+============================================================ */
+
+export const deleteS3Object = async ({ key }) => {
   const command = new DeleteObjectCommand({
     Bucket: bucket,
-    Key: redefinedKey,
+    Key: key,
   });
 
-  const res = await s3Client.send(command);
-  return res;
+  return await s3Client.send(command);
 };
 
-export const deleteS3Objects = async ({ Keys }) => {
+export const deleteS3Objects = async ({ keys }) => {
   const command = new DeleteObjectsCommand({
     Bucket: bucket,
     Delete: {
-      Objects: Keys,
+      Objects: keys.map((Key) => ({ Key })),
       Quiet: false,
     },
   });
 
-  const res = await s3Client.send(command);
-  return res;
+  return await s3Client.send(command);
 };
 
+/* ============================================================
+   SOFT DELETE (active → deleted)
+============================================================ */
 
+export const softDeleteS3Object = async ({ key }) => {
+  if (!key) throw new Error("Key is required");
 
-export const softDeleteS3Object = async ({ Key }) => {
-  if (!Key) throw new Error("S3 Key is required");
+  const sourceKey = `uploads/active/${key}`;
+  const deletedKey = `uploads/deleted/${key}`;
 
-  const sourceKey = `uploads/active/${Key}`;
-  const deletedKey = `uploads/deleted/${Key}`;
-
-  // 1️⃣ Copy object (this resets creation time)
+  // Copy to deleted
   await s3Client.send(
     new CopyObjectCommand({
-      Bucket: "storag22b",
-      CopySource: `storag22b/${sourceKey}`,
+      Bucket: bucket,
+      CopySource: `${bucket}/${sourceKey}`,
       Key: deletedKey,
-      MetadataDirective: "COPY"
+      MetadataDirective: "COPY",
     })
   );
 
-  // 2️⃣ Delete original
+  // Remove original
   await s3Client.send(
     new DeleteObjectCommand({
-      Bucket: "storag22b",
-      Key: sourceKey
+      Bucket: bucket,
+      Key: sourceKey,
     })
   );
 };
 
+/* ============================================================
+   RESTORE (deleted → active)
+============================================================ */
 
-export const restoreS3Object = async ({ Key }) => {
-  const deletedKey = `uploads/deleted/${Key}`;
-  const activeKey = `uploads/active/${Key}`;
+export const restoreS3Object = async ({ key }) => {
+  if (!key) throw new Error("Key is required");
+
+  const deletedKey = `uploads/deleted/${key}`;
+  const activeKey = `uploads/active/${key}`;
 
   await s3Client.send(
     new CopyObjectCommand({
-      Bucket: "storag22b",
-      CopySource: `storag22b/${deletedKey}`,
+      Bucket: bucket,
+      CopySource: `${bucket}/${deletedKey}`,
       Key: activeKey,
-      MetadataDirective: "COPY"
+      MetadataDirective: "COPY",
     })
   );
 
   await s3Client.send(
     new DeleteObjectCommand({
-      Bucket: "storag22b",
-      Key: deletedKey
+      Bucket: bucket,
+      Key: deletedKey,
     })
   );
 };
-

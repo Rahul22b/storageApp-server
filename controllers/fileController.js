@@ -2,40 +2,52 @@ import path from "path";
 import Directory from "../models/directoryModel.js";
 import File from "../models/fileModel.js";
 import User from "../models/userModel.js";
+
 import {
   generatePreSignedUploadURL,
-  generatePreSigendGetURL,
+  generatePreSignedGetURL,
   deleteS3Object,
   getFileContentLength,
   restoreS3Object,
-  softDeleteS3Object
+  softDeleteS3Object,
 } from "../services/awsService.js";
 
+/* ============================================================
+   DIRECTORY SIZE UPDATE
+============================================================ */
+
 export async function updateDirectoriesSize(parentId, deltaSize) {
-  console.log("runninf update size");
   while (parentId) {
     const dir = await Directory.findById(parentId);
+    if (!dir) break;
     dir.size += deltaSize;
     await dir.save();
     parentId = dir.parentDirId;
   }
 }
 
+/* ============================================================
+   CREATE UPLOAD SIGNED URL
+============================================================ */
+
 export const createuploadSignedUrl = async (req, res, next) => {
-  const parentDirId = req.params.parentDirId || req.user.rootDirId;
   try {
-    const parentDirData = await Directory.findOne({
+    const parentDirId = req.params.parentDirId || req.user.rootDirId;
+
+    const parentDir = await Directory.findOne({
       _id: parentDirId,
       userId: req.user._id,
+      deletedAt: null,
     });
 
-    if (!parentDirData) {
-      return res.status(404).json({ error: "Parent directory not found!" });
+    if (!parentDir) {
+      return res.status(404).json({ error: "Parent directory not found" });
     }
-
+      console.log(req.headers);
     const filename = req.headers.filename || "untitled";
     const filesize = Number(req.headers.filesize);
     const type = req.headers.type;
+    const contentType = type || "application/octet-stream";
 
     if (!filesize || isNaN(filesize)) {
       return res.status(400).json({ error: "Invalid filesize" });
@@ -43,174 +55,241 @@ export const createuploadSignedUrl = async (req, res, next) => {
     if (!type) {
       return res.status(400).json({ error: "Missing Content-Type" });
     }
-
+ 
     const user = await User.findById(req.user._id);
     const rootDir = await Directory.findById(req.user.rootDirId);
-    const remainingSpace = user.maxStorageInBytes - rootDir.size;
 
+    const remainingSpace = user.maxStorageInBytes - rootDir.size;
     if (filesize > remainingSpace) {
-      console.log("File too large");
       return res.status(400).json({ error: "File too large" });
     }
 
     const extension = path.extname(filename);
 
-    const insertedFile = await File.insertOne({
-      extension,
+    const file = await File.create({
       name: filename,
+      extension,
       size: filesize,
-      parentDirId: parentDirData._id,
+      parentDirId: parentDir._id,
+      userId: req.user._id,
+      deletedAt: null,
+    });
+
+    const s3Key = `${file._id}${extension}`;
+
+    const url = await generatePreSignedUploadURL({
+      key: s3Key,
+      contentType,
+    });
+
+    return res.status(200).json({
+      url,
+      fileId: file._id,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ============================================================
+   GET FILE (VIEW / DOWNLOAD)
+============================================================ */
+
+export const getFile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const file = await File.findOne({
+      _id: id,
+      userId: req.user._id,
+      deletedAt: null,
+    }).lean();
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    const s3Key = `uploads/active/${file._id}${file.extension}`;
+
+    const url = generatePreSignedGetURL({
+      key: s3Key,
+      action: req.query.action,
+      filename: file.name,
+    });
+
+    return res.redirect(url);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ============================================================
+   RENAME FILE
+============================================================ */
+
+export const renameFile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const file = await File.findOne({
+      _id: id,
+      userId: req.user._id,
+      deletedAt: null,
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    file.name = req.body.newFilename;
+    await file.save();
+
+    return res.status(200).json({ message: "Renamed successfully" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ============================================================
+   HARD DELETE (PERMANENT)
+============================================================ */
+
+export const deleteFile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const file = await File.findOne({
+      _id: id,
       userId: req.user._id,
     });
 
-    // Adjust this depending on your DB driver
-    const fileId = insertedFile.insertedId || insertedFile._id || insertedFile.id;
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
 
-    const fullFileName = `uploads/active/${fileId}${extension}`;
-    const url = await generatePreSignedUploadURL({ Key: fullFileName, ContentType: type });
-
-    res.status(200).json({
-      url,
-      fileId,
+    await deleteS3Object({
+      key: `uploads/active/${file._id}${file.extension}`,
     });
-  } catch (err) {
-    console.log(err);
-    next(err);
-  }
-};
 
-
-export const getFile = async (req, res) => {
-  const { id } = req.params;
-  const fileData = await File.findOne({
-    _id: id,
-    userId: req.user._id,
-  }).lean();
-
-  if (!fileData) {
-    return res.status(404).json({ error: "File not found!" });
-  }
-
-  const filePath = `uploads/active/${id}${fileData.extension}`;
-
-  const url = await generatePreSigendGetURL(
-   { Key: filePath,
-    Action : req.query.action,
-   Filename: fileData.name}
-  );
-  return res.redirect(url);
-};
-
-export const renameFile = async (req, res, next) => {
-  const { id } = req.params;
-  const file = await File.findOne({
-    _id: id,
-    userId: req.user._id,
-  });
-
-  // Check if file exists
-  if (!file) {
-    return res.status(404).json({ error: "File not found!" });
-  }
-
-  try {
-    file.name = req.body.newFilename;
-    await file.save();
-    return res.status(200).json({ message: "Renamed" });
-  } catch (err) {
-    console.log(err);
-    err.status = 500;
-    next(err);
-  }
-};
-
-export const deleteFile = async (req, res, next) => {
-  const { id } = req.params;
-  const file = await File.findOne({
-    _id: id,
-    userId: req.user._id,
-  });
-
-  if (!file) {
-    return res.status(404).json({ error: "File not found!" });
-  }
-
-  try {
-    await deleteS3Object(`{id.$file.extension}`);
     await file.deleteOne();
-    return res.status(200).json({ message: "File Deleted Successfully" });
+
+    return res.status(200).json({ message: "File deleted permanently" });
   } catch (err) {
     next(err);
   }
 };
+
+/* ============================================================
+   SOFT DELETE
+============================================================ */
 
 export const softDeleteFile = async (req, res, next) => {
-  const { id } = req.params;
-  const file = await File.findOne({
-    _id: id,
-    userId: req.user._id,
-    deletedAt: null,
-  });
-  if (!file) {
-    return res.status(404).json({ error: "File not found!" });
-  }
-
   try {
+    const { id } = req.params;
+
+    const file = await File.findOne({
+      _id: id,
+      userId: req.user._id,
+      deletedAt: null,
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
     file.deletedAt = new Date();
     await file.save();
-    await softDeleteS3Object({ Key: `${file.id}${file.extension}` });
+
+    await softDeleteS3Object({
+      key: `${file._id}${file.extension}`,
+    });
+
     await updateDirectoriesSize(file.parentDirId, -file.size);
-    return res.status(200).json({ message: "File Deleted Successfully" });
+
+    return res.status(200).json({ message: "File moved to trash" });
   } catch (err) {
     next(err);
   }
 };
+
+/* ============================================================
+   RESTORE FILE
+============================================================ */
 
 export const restoreFile = async (req, res, next) => {
-  const { id } = req.params;
-  const file = await File.findOne({
-    _id: id,
-    userId: req.user._id,
-    deletedAt: { $ne: null },
-  });
-  if (!file) {
-    return res.status(404).json({ error: "File not found!" });
-  }
-
-  if(!await Directory.findOne({_id:file.parentDirId,userId:req.user._id,deletedAt:null}).lean()){
-    return  res.status(400).json({ error: "Cannot restore file as parent directory is deleted." });
-  }
-
   try {
-    await File.updateOne({ _id: id }, { deletedAt: null });
+    const { id } = req.params;
+
+    const file = await File.findOne({
+      _id: id,
+      userId: req.user._id,
+      deletedAt: { $ne: null },
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    const parentExists = await Directory.exists({
+      _id: file.parentDirId,
+      userId: req.user._id,
+      deletedAt: null,
+    });
+
+    if (!parentExists) {
+      return res.status(400).json({
+        error: "Cannot restore file because parent directory is deleted",
+      });
+    }
+
+    file.deletedAt = null;
+    await file.save();
+
+    await restoreS3Object({
+      key: `${file._id}${file.extension}`,
+    });
+
     await updateDirectoriesSize(file.parentDirId, file.size);
-    await restoreS3Object({ Key: `${file.id}${file.extension}` });
-    return res.status(200).json({ message: "File Restored Successfully" });
+
+    return res.status(200).json({ message: "File restored successfully" });
   } catch (err) {
     next(err);
   }
 };
 
+/* ============================================================
+   VERIFY UPLOAD
+============================================================ */
+
 export const checkfileupload = async (req, res, next) => {
+  try {
+    const { fileId } = req.body;
 
-  try{
-     const file = await File.findById(req.body.fileId);
-  if (!file) {
-    return res.json({ error: "file not found at pur record" });
-  }
-  const contentLength = await getFileContentLength(
-    { Key: `${file.id}${file.extension}` }
-  );
-  if (contentLength != file.size) {
-    req.params = { id: file.id };
-    await deleteFile(req, res, next);
-    return res.status("400").json({ error: "file not uploaded" });
-  }
-  await updateDirectoriesSize(file.parentDirId, parseInt(contentLength));
+    const file = await File.findById(fileId);
+    if (!file) {
+      return res.status(404).json({ error: "File not found in records" });
+    }
 
-  return res.status(200).json({ message: "file uploaded successfully " });
-  }
- catch(err){ 
+    const contentLength = await getFileContentLength({
+       key: `uploads/active/${file._id}${file.extension}`,
+    });
+
+    if (contentLength !== file.size) {
+      await deleteFile(
+        { ...req, params: { id: file._id } },
+        res,
+        next
+      );
+      return res.status(400).json({ error: "File upload failed" });
+    }
+
+    await updateDirectoriesSize(file.parentDirId, contentLength);
+
+    return res.status(200).json({ message: "File uploaded successfully" });
+  } catch (err) {
+
     next(err);
   }
 };
+
+
