@@ -6,6 +6,7 @@ import { verifyIdToken } from "../services/googleAuthService.js";
 import { sendOtpService } from "../services/sendOtpService.js";
 import redisClient from "../config/redis.js";
 import { otpSchema } from "../validators/authSchema.js";
+import { verifygitIdToken } from "../services/githubAuthService.js";
 
 export const sendOtp = async (req, res, next) => {
   const { email } = req.body;
@@ -190,6 +191,118 @@ export const loginWithGoogle = async (req, res, next) => {
 
     mongooseSession.commitTransaction();
     res.status(201).json({ message: "account created and logged in" });
+  } catch (err) {
+    mongooseSession.abortTransaction();
+    next(err);
+  }
+};
+
+
+export const loginWithGithub = async (req, res, next) => {
+  console.log(req.query);
+
+  const { code } = req.query;
+
+  const userData = await verifygitIdToken(code);
+  console.log(userData);
+  const { name, email, avatar:picture } = userData;
+  const user = await User.findOne({ email }).select("-__v");
+  if (user) {
+    if (user.deleted) {
+      return res.status(403).json({
+        error: "Your account has been deleted. Contact app owner to recover.",
+      });
+    }
+
+    const allSessions = await redisClient.ft.search(
+      "userIdIdx",
+      `@userId:{${user.id}}`,
+      {
+        RETURN: [],
+      }
+    );
+
+    if (allSessions.total >= 2) {
+      await redisClient.del(allSessions.documents[0].id);
+    }
+
+    if (!user.picture.includes("googleusercontent.com")) {
+      user.picture = picture;
+      await user.save();
+    }
+
+    const sessionId = crypto.randomUUID();
+    const redisKey = `session:${sessionId}`;
+    await redisClient.json.set(redisKey, "$", {
+      userId: user._id,
+      rootDirId: user.rootDirId,
+    });
+
+    const sessionExpiryTime = 60 * 1000 * 60 * 24 * 7;
+    await redisClient.expire(redisKey, sessionExpiryTime / 1000);
+
+    res.cookie("sid", sessionId, {
+      httpOnly: true,
+      signed: true,
+      maxAge: sessionExpiryTime,
+      sameSite: "none",
+      secure: true,
+    });
+    // return res.json({ message: "logged in" });
+    return res.redirect(process.env.CLIENT_URL);
+  }
+
+  const mongooseSession = await mongoose.startSession();
+
+  try {
+    const rootDirId = new Types.ObjectId();
+    const userId = new Types.ObjectId();
+
+    mongooseSession.startTransaction();
+
+    await Directory.insertOne(
+      {
+        _id: rootDirId,
+        name: `root-${email}`,
+        parentDirId: null,
+        userId,
+      },
+      { mongooseSession }
+    );
+
+    await User.insertOne(
+      {
+        _id: userId,
+        name,
+        email,
+        picture,
+        rootDirId,
+      },
+      { mongooseSession }
+    );
+
+    const sessionId = crypto.randomUUID();
+    const redisKey = `session:${sessionId}`;
+    await redisClient.json.set(redisKey, "$", {
+      userId: userId,
+      rootDirId: rootDirId,
+    });
+
+    const sessionExpiryTime = 60 * 1000 * 60 * 24 * 7;
+    await redisClient.expire(redisKey, sessionExpiryTime / 1000);
+
+    res.cookie("sid", sessionId, {
+      httpOnly: true,
+      signed: true,
+      maxAge: sessionExpiryTime,
+      sameSite: "none",
+      secure: true,
+
+    });
+
+    mongooseSession.commitTransaction();
+    res.redirect(process.env.CLIENT_URL);
+    // res.status(201).json({ message: "account created and logged in" });
   } catch (err) {
     mongooseSession.abortTransaction();
     next(err);
