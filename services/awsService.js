@@ -5,6 +5,8 @@ import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
   CopyObjectCommand,
+  GetObjectCommand,
+
 } from "@aws-sdk/client-s3";
 import fs from "fs";
 
@@ -34,7 +36,7 @@ export const s3Client = new S3Client({
    CLOUD FRONT SIGNED GET URL
 ============================================================ */
 
-export const generatePreSignedGetURL = ({ key }) => {
+export function generateCloudFrontViewUrl(key) {
   const cleanDomain = CLOUDFRONT_URL.replace(/\/$/, "");
   const privateKey = fs.readFileSync("./private_key.pem", "utf8");
 
@@ -42,9 +44,24 @@ export const generatePreSignedGetURL = ({ key }) => {
     url: `${cleanDomain}/${key}`,
     keyPairId: process.env.KEY_PAIR_ID,
     privateKey,
-    dateLessThan: new Date(Date.now() + 60 * 60 * 1000)
+    dateLessThan: new Date(Date.now() + 60 * 60 * 1000),
   });
-};
+}
+
+
+
+export async function generateS3DownloadUrl({ key, filename }) {
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ResponseContentDisposition: `attachment; filename="${filename}"`,
+  });
+
+  return getSignedUrl(s3Client, command, {
+    expiresIn: 60 * 60,
+  });
+}
+
 
 
 /* ============================================================
@@ -61,6 +78,7 @@ export const generatePreSignedUploadURL = async ({
     Bucket: bucket,
     Key: `uploads/active/${key}`,
     ContentType: contentType,
+    // ContentLength:
     // ChecksumAlgorithm: undefined,
   });
 

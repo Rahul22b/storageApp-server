@@ -17,7 +17,7 @@ app.use(cookieParser(process.env.SESSION_SECRET));
 app.use(express.json());
 app.use(
   cors({
-    origin: [process.env.CLIENT_URL,"https://storage22b.netlify.app"],
+    origin: [process.env.CLIENT_URL,"https://storage22b.netlify.app","https://www.storage22b.space"],
     credentials: true,
   })
 );

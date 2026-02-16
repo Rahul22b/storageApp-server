@@ -5,7 +5,8 @@ import User from "../models/userModel.js";
 
 import {
   generatePreSignedUploadURL,
-  generatePreSignedGetURL,
+  generateS3DownloadUrl,
+  generateCloudFrontViewUrl,
   deleteS3Object,
   getFileContentLength,
   restoreS3Object,
@@ -111,11 +112,22 @@ export const getFile = async (req, res, next) => {
 
     const s3Key = `uploads/active/${file._id}${file.extension}`;
 
-    const url = generatePreSignedGetURL({
-      key: s3Key,
-      action: req.query.action,
-      filename: file.name,
-    });
+    if (req.query.action === "download") {
+      const url = await generateS3DownloadUrl({
+        bucket: process.env.AWS_BUCKET_NAME,
+        key: s3Key,
+        filename: file.name,
+      });
+      return res.redirect(url);
+    }
+    const url =  generateCloudFrontViewUrl({ key: s3Key });
+
+    
+    // const url = generatePreSignedGetURL({
+    //   key: s3Key,
+    //   action: req.query.action,
+    //   filename: file.name,
+    // });
 
     return res.redirect(url);
   } catch (err) {
