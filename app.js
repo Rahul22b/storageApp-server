@@ -25,7 +25,10 @@ app.use(
 app.options('*', cors());
 
 app.get("/",(req,res)=>{
-return res.status(200).json({"message":"welcome to storage App"})
+  res.setHeaders ({
+    "Content-Type": "text/html"
+  });
+return res.status(200).send("<h1>Storage App API</h1><p>Welcome to the Storage App API. Please refer to the documentation for usage details.</p>");
 })
 
 app.use("/directory", checkAuth, directoryRoutes);
