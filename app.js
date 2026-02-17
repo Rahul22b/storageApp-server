@@ -25,7 +25,7 @@ app.use(
 
 app.options('*', cors());
 
-app.get("/githubWebhook",(req,res)=>{
+app.post("/githubWebhook",(req,res)=>{
   return res.status(200).send("GitHub Webhook Endpoint");
   console.log("GitHub Webhook Endpoint Hit");
   console.log(req.body);
