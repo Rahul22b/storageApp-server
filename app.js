@@ -25,6 +25,13 @@ app.use(
 
 app.options('*', cors());
 
+app.get("/githubWebhook",(req,res)=>{
+  return res.status(200).send("GitHub Webhook Endpoint");
+  console.log("GitHub Webhook Endpoint Hit");
+  console.log(req.body);
+})
+
+
 app.get("/",(req,res)=>{
 return res.status(200).send("<h1>Storage App API</h1><p>Welcome to the Storage App API. Please refer to the documentation for usage details.</p>");
 })
