@@ -9,6 +9,9 @@ import authRoutes from "./routes/authRoutes.js";
 import checkAuth from "./middlewares/authMiddleware.js";
 import { connectDB } from "./config/db.js";
 import subscriptionRoutes from "./routes/subscriptionRoutes.js"
+import crypto from "crypto";
+import { exec } from "child_process";
+
 await connectDB();
 
 const PORT = process.env.PORT || 4000;
