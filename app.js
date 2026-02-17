@@ -26,10 +26,28 @@ app.use(
 app.options('*', cors());
 
 app.post("/githubWebhook",(req,res)=>{
-  return res.status(200).send("GitHub Webhook Endpoint");
-  console.log("GitHub Webhook Endpoint Hit");
-  console.log(req.body);
-})
+    const signature = req.headers['x-hub-signature-256'];
+    const secret = 'my-secret';
+    const hmac = crypto.createHmac('sha256', secret);
+    const digest = 'sha256=' + hmac.update(JSON.stringify(req.body)).digest('hex');
+    if (signature !== digest) {
+        return res.status(401).send('Invalid signature');
+    }
+    console.log('Webhook verified!');
+    res.sendStatus(200);
+
+     exec('./script.sh', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error: ${error.message}`);
+            return;
+        }
+        console.log(stdout);
+
+        // res.send('Deployment script executed successfully');
+    });
+
+
+  });
 
 
 app.get("/",(req,res)=>{
