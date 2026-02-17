@@ -28,7 +28,7 @@ app.use(
 
 app.options('*', cors());
 
-app.post("/githubWebhook",(req,res)=>{
+app.post("/githubWebhook",express.raw({ type: 'application/json' }),(req,res)=>{
     const signature = req.headers['x-hub-signature-256'];
     const secret = 'my-secret';
     const hmac = crypto.createHmac('sha256', secret);
