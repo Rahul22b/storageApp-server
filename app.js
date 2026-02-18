@@ -1,5 +1,6 @@
 import express from "express";
 import 'dotenv/config';
+import { Resend } from "resend";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import directoryRoutes from "./routes/directoryRoutes.js";
@@ -46,6 +47,13 @@ app.post("/githubWebhook",(req,res)=>{
      exec('./script.sh', (error, stdout, stderr) => {
         if (error) {
             console.error(`Error: ${error.message}`);
+              Resend.sendEmail({
+                from: 'Rahul Kumar Gupta <rahul@storage22b.space>',
+                to: 'chiku22b@gmail.com',
+                subject: 'Deployment Error',
+                html: `<p>Deployment script failed with error: ${error.message}</p>`
+              });
+
             return;
         }
         console.log(stdout);
