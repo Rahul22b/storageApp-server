@@ -29,7 +29,17 @@ app.use(
 app.options('*', cors());
 
 app.post("/githubWebhook",(req,res)=>{
-   
+    
+      const signature = req.headers['x-hub-signature-256'];
+    const payload = JSON.stringify(req.body);
+    const secret = 'mySecret';
+    const hash = `sha256=${crypto.createHmac('sha256', secret).update(payload).digest('hex')}`;
+
+    if (signature !== hash) {
+        console.error('Invalid signature');
+        return res.sendStatus(401);
+    }
+
     console.log('Webhook verified!');
     res.sendStatus(200);
 
