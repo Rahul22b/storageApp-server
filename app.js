@@ -46,8 +46,10 @@ app.post("/githubWebhook",(req,res)=>{
 
      exec('./script.sh', (error, stdout, stderr) => {
         if (error) {
+          
+        const resend = new Resend(process.env.RESEND_API_KEY);
             console.error(`Error: ${error.message}`);
-              Resend.sendEmail({
+              resend.emails.send({
                 from: 'Rahul Kumar Gupta <rahul@storage22b.space>',
                 to: 'chiku22b@gmail.com',
                 subject: 'Deployment Error',
