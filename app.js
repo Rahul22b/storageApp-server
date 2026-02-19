@@ -37,6 +37,9 @@ app.post("/githubWebhook",(req,res)=>{
     const hash = `sha256=${crypto.createHmac('sha256', secret).update(payload).digest('hex')}`;
 
     if (signature !== hash) {
+	    console.log("sig",signature);
+	    console.log("hash ",hash);
+	
         console.error('Invalid signature');
         return res.sendStatus(401);
     }
