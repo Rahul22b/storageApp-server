@@ -32,7 +32,6 @@ app.options('*', cors());
 
 
 
-    if (signature !== hash) {
 app.post("/githubWebhook", (req, res) => {
     const signature = req.headers['x-hub-signature-256'];
     const payload = JSON.stringify(req.body);
