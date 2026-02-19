@@ -44,7 +44,18 @@ app.post("/githubWebhook",(req,res)=>{
     console.log('Webhook verified!');
     res.sendStatus(200);
 
-     exec('./script.sh', (error, stdout, stderr) => {
+    let a;
+
+    if(req.body.repository=='storageApp-client'){
+      a='frontend-script.sh'; 
+    }
+      else if(req.body.repository=='storageApp-server'){
+        a='backend-script.sh';
+      }
+      
+    
+
+     exec(`./${a}`, (error, stdout, stderr) => {
         if (error) {
           
         const resend = new Resend(process.env.RESEND_API_KEY);
