@@ -46,10 +46,10 @@ app.post("/githubWebhook",(req,res)=>{
 
     let a;
 
-    if(req.body.repository=='storageApp-client'){
+    if(req.body.repository.name=='storageApp-client'){
       a='frontend-script.sh'; 
     }
-      else if(req.body.repository=='storageApp-server'){
+      else if(req.body.repository.name=='storageApp-server'){
         a='backend-script.sh';
       }
       
