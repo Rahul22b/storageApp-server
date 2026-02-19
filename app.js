@@ -29,60 +29,66 @@ app.use(
 
 app.options('*', cors());
 
-app.post("/githubWebhook",(req,res)=>{
-    
-      const signature = req.headers['x-hub-signature-256'];
-    const payload = JSON.stringify(req.body);
-    const secret = 'mySecret';
-    const hash = `sha256=${crypto.createHmac('sha256', secret).update(payload).digest('hex')}`;
+const crypto = require('crypto');
+const { exec } = require('child_process');
+
 
     if (signature !== hash) {
-	    console.log("sig",signature);
-	    console.log("hash ",hash);
-	
+app.post("/githubWebhook", (req, res) => {
+    const signature = req.headers['x-hub-signature-256'];
+    const payload = JSON.stringify(req.body);
+    const secret = 'mySecret'; // Use env variables!
+
+    // Compute the hash
+    const hmac = crypto.createHmac('sha256', secret);
+    const digest = Buffer.from('sha256=' + hmac.update(payload).digest('hex'), 'utf8');
+    const checksum = Buffer.from(signature, 'utf8');
+
+    // Timing-safe comparison
+    if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
+>>>>>>> 290b50002275c2e7f98836e2bda247dec4e3f756
         console.error('Invalid signature');
         return res.sendStatus(401);
     }
 
     console.log('Webhook verified!');
-    res.sendStatus(200);
+    res.sendStatus(200); // Respond to GitHub immediately
 
-    let a;
+    // Identify which repo triggered the hook
+    const repoName = req.body.repository.name; 
+    let scriptToRun = '';
 
-    if(req.body.repository=='storageApp-client'){
-      a='frontend-script.sh'; 
+    if (repoName === 'storageApp-client') {
+        scriptToRun = 'frontend-script.sh';
+    } else if (repoName === 'storageApp-server') {
+        scriptToRun = 'backend-script.sh';
     }
-      else if(req.body.repository=='storageApp-server'){
-        a='backend-script.sh';
-      }
-      
-    
 
-     exec(`./${a}`, (error, stdout, stderr) => {
-        if (error) {
-          
-        const resend = new Resend(process.env.RESEND_API_KEY);
-            console.error(`Error: ${error.message}`);
-              resend.emails.send({
-                from: 'Rahul Kumar Gupta <rahul@storage22b.space>',
-                to: 'chiku22b@gmail.com',
-                subject: 'Deployment Error',
-                html: `<p>Deployment script failed with error: ${error.message}</p>`
-              });
-
-            return;
-        }
-        console.log(stdout);
-
-        // res.send('Deployment script executed successfully');
-    });
-
-
-  });
-
+    // Only execute if a valid repo was matched
+    if (scriptToRun) {
+        exec(`./${scriptToRun}`, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error: ${error.message}`);
+                
+                // Alerting via Resend
+                const resend = new Resend(process.env.RESEND_API_KEY);
+                resend.emails.send({
+                    from: 'Rahul Kumar Gupta <rahul@storage22b.space>',
+                    to: 'chiku22b@gmail.com',
+                    subject: `Deployment Error: ${repoName}`,
+                    html: `<p>Deployment script <b>${scriptToRun}</b> failed with error: ${error.message}</p>`
+                });
+                return;
+            }
+            console.log(`STDOUT: ${stdout}`);
+        });
+    } else {
+        console.log(`No script defined for repository: ${repoName}`);
+    }
+});
 
 app.get("/",(req,res)=>{
-return res.status(200).send("<h1>Rahul Kumar Gupta</h1><p>Welcome to the Storage App API. Please refer to the documentation for usage details.</p>");
+return res.status(200).send("<h1>Rimsha my darling</h1><p>Welcome to the Storage App API. Please refer to the documentation for usage details.</p>");
 })
 
 app.use("/directory", checkAuth, directoryRoutes);
