@@ -45,7 +45,7 @@ app.post("/githubWebhook", (req, res) => {
 
     // Timing-safe comparison
     if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
->>>>>>> 290b50002275c2e7f98836e2bda247dec4e3f756
+
         console.error('Invalid signature');
         return res.sendStatus(401);
     }
