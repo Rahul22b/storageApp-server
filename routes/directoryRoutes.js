@@ -25,7 +25,7 @@ router.patch("/:id", renameDirectory);
 
 router.delete("/:id", softDeleteDirectory);
 
-router.delete("/restore/:id", deleteDirectory);
+router.delete("/delete/:id", deleteDirectory);
 
 router.patch('/restore/:directoryId', restoreDirectory);
 

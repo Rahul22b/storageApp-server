@@ -3,7 +3,49 @@ import User from "../models/userModel.js";
 import mongoose, { Types } from "mongoose";
 import redisClient from "../config/redis.js";
 import { z } from "zod/v4";
+import crypto from "crypto";
 import { loginSchema, registerSchema } from "../validators/authSchema.js";
+
+const extractRedisField = (doc, field) => {
+  if (!doc) return undefined;
+  if (doc.value && Object.prototype.hasOwnProperty.call(doc.value, field)) {
+    return doc.value[field];
+  }
+  if (Object.prototype.hasOwnProperty.call(doc, field)) {
+    return doc[field];
+  }
+  return undefined;
+};
+
+const deleteSessionsByUserId = async (userId) => {
+  const allSessions = await redisClient.ft.search(
+    "userIdIdx",
+    `@userId:{${userId}}`,
+    {
+      RETURN: [],
+    }
+  );
+
+  const keysToDelete = allSessions.documents.map(({ id }) => id);
+  if (keysToDelete.length > 0) {
+    await redisClient.del(keysToDelete);
+  }
+};
+
+const getLoggedInUserIds = async () => {
+  const allSessions = await redisClient.ft.search(
+    "userIdIdx",
+    `@userId:{*}`,
+    {
+      RETURN: ["userId"],
+    }
+  );
+
+  return allSessions.documents
+    .map((doc) => extractRedisField(doc, "userId"))
+    .filter(Boolean)
+    .map((id) => id.toString());
+};
 
 export const register = async (req, res, next) => {
   const { success, data, error } = registerSchema.safeParse(req.body);
@@ -94,7 +136,7 @@ export const login = async (req, res, next) => {
   const { email, password } = data;
   const user = await User.findOne({ email });
 
-  if (!user) {
+  if (!user || user.deleted) {
     return res.status(404).json({ error: "Invalid Credentials" });
   }
 
@@ -138,33 +180,37 @@ export const login = async (req, res, next) => {
 
 export const getAllUsers = async (req, res) => {
   const allUsers = await User.find({ deleted: false }).lean();
-  const allSessions = await Session.find().lean();
-  const allSessionsUserId = allSessions.map(({ userId }) => userId.toString());
-  const allSessionsUserIdSet = new Set(allSessionsUserId);
+  const loggedInUserIds = new Set(await getLoggedInUserIds());
 
   const transformedUsers = allUsers.map(({ _id, name, email }) => ({
     id: _id,
     name,
     email,
-    isLoggedIn: allSessionsUserIdSet.has(_id.toString()),
+    isLoggedIn: loggedInUserIds.has(_id.toString()),
   }));
   res.status(200).json(transformedUsers);
 };
 
 export const getCurrentUser = async (req, res) => {
-  try{
-      const user = await User.findById(req.user._id).lean();
-  const rootDir = await Directory.findById(user.rootDirId).lean();
-   res.status(200).json({
-    name: user.name,
-    email: user.email,
-    picture: user.picture,
-    role: user.role,
-    maxStorageInBytes: user.maxStorageInBytes,
-    usedStorageInBytes: rootDir.size,
-  });
-  }
-  catch(err){
+  try {
+    const user = await User.findById(req.user._id).lean();
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const rootDir = user.rootDirId
+      ? await Directory.findById(user.rootDirId).lean()
+      : null;
+
+    return res.status(200).json({
+      name: user.name,
+      email: user.email,
+      picture: user.picture,
+      role: user.role,
+      maxStorageInBytes: user.maxStorageInBytes,
+      usedStorageInBytes: rootDir?.size ?? 0,
+    });
+  } catch (err) {
     console.error("Error in getCurrentUser:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
@@ -179,7 +225,7 @@ export const logout = async (req, res) => {
 
 export const logoutById = async (req, res, next) => {
   try {
-    await Session.deleteMany({ userId: req.params.userId });
+    await deleteSessionsByUserId(req.params.userId);
     res.status(204).end();
   } catch (err) {
     next(err);
@@ -194,11 +240,7 @@ export const logoutAll = async (req, res) => {
 
   // 2. CHECK FOR NULL/UNDEFINED SESSION 🛑
   if (!session || !session.userId) {
-    // If the session is null, or the userId is missing, 
-    // the user is effectively already logged out or the session is invalid.
-    return res.status(204).end(); // Send success/no-content as session cleanup is done
-    // Alternatively, send a 401/403 if you prefer an error:
-    // return res.status(401).send({ error: "Invalid session." });
+    return res.clearCookie("sid").status(204).end();
   }
 
   // 3. Proceed with search and deletion only if userId is valid
@@ -211,14 +253,11 @@ export const logoutAll = async (req, res) => {
   );
 
   const keysToDelete = allSessions.documents.map(({ id }) => id);
-  console.log(keysToDelete);
 
   if (keysToDelete.length > 0) {
-    // Use del or unlink for efficient bulk deletion
-    await redisClient.del(keysToDelete); 
+    await redisClient.del(keysToDelete);
   }
-  
-  res.status(204).end();
+  res.clearCookie("sid").status(204).end();
 };
 
 export const deleteUser = async (req, res, next) => {
@@ -227,7 +266,7 @@ export const deleteUser = async (req, res, next) => {
     return res.status(403).json({ error: "You can not delete yourself." });
   }
   try {
-    await Session.deleteMany({ userId });
+    await deleteSessionsByUserId(userId);
     await User.findByIdAndUpdate(userId, { deleted: true });
     res.status(204).end();
   } catch (err) {

@@ -287,11 +287,10 @@ export const checkfileupload = async (req, res, next) => {
     });
 
     if (contentLength !== file.size) {
-      await deleteFile(
-        { ...req, params: { id: file._id } },
-        res,
-        next
-      );
+      await deleteS3Object({
+        key: `uploads/active/${file._id}${file.extension}`,
+      });
+      await file.deleteOne();
       return res.status(400).json({ error: "File upload failed" });
     }
 

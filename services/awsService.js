@@ -57,7 +57,7 @@ export async function generateS3DownloadUrl({ key, filename }) {
     ResponseContentDisposition: `attachment; filename="${filename}"`,
   });
 
-  return getSignedUrl(s3Client, command, {
+  return getS3SignedUrl(s3Client, command, {
     expiresIn: 60 * 60,
   });
 }

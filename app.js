@@ -19,7 +19,14 @@ const PORT = process.env.PORT || 4000;
 
 const app = express();
 app.use(cookieParser(process.env.SESSION_SECRET));
-app.use(express.json());
+
+const rawBodySaver = (req, res, buf, encoding) => {
+  if (buf && buf.length) {
+    req.rawBody = buf.toString(encoding || "utf8");
+  }
+};
+
+app.use(express.json({ verify: rawBodySaver }));
 app.use(
   cors({
     origin: [process.env.CLIENT_URL,"https://storage22b.netlify.app","https://www.storage22b.space"],
@@ -34,8 +41,8 @@ app.options('*', cors());
 
 app.post("/githubWebhook", (req, res) => {
     const signature = req.headers['x-hub-signature-256'];
-    const payload = JSON.stringify(req.body);
-    const secret = 'mySecret'; // Use env variables!
+    const payload = req.rawBody || JSON.stringify(req.body);
+    const secret = process.env.GITHUB_WEBHOOK_SECRET || 'mySecret';
 
     // Compute the hash
     const hmac = crypto.createHmac('sha256', secret);

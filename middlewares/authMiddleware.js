@@ -1,4 +1,5 @@
 import redisClient from "../config/redis.js";
+import User from "../models/userModel.js";
 
 export default async function checkAuth(req, res, next) {
   const { sid } = req.signedCookies;
@@ -15,7 +16,17 @@ export default async function checkAuth(req, res, next) {
     return res.status(401).json({ error: "2 Not logged in!" });
   }
 
-  req.user = { _id: session.userId, rootDirId: session.rootDirId };
+  const user = await User.findById(session.userId).select("role deleted").lean();
+  if (!user || user.deleted) {
+    res.clearCookie("sid");
+    return res.status(401).json({ error: "Session invalid or user deleted." });
+  }
+
+  req.user = {
+    _id: session.userId,
+    rootDirId: session.rootDirId,
+    role: user.role,
+  };
   next();
 }
 

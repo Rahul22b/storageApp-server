@@ -63,14 +63,17 @@ export const createSubscription = async (req, res, next) => {
 
 export const handleWebhook = async (req, res, next) => {
   console.log("webhook triggered");
-  console.log(req.body);
   try {
-    const subscriptionId=req.body.payload.subscription.entity.id;
+    const rawBody =
+      req.body instanceof Buffer ? req.body.toString("utf8") : JSON.stringify(req.body);
+    const body =
+      req.body instanceof Buffer ? JSON.parse(req.body.toString("utf8")) : req.body;
+    const subscriptionId = body.payload.subscription.entity.id;
     const isValid = razorpay.validateWebhookSignature(
-    JSON.stringify(req.body),
-    req.headers["x-razorpay-signature"],
-    process.env.WEBHOOK_SECRET
-  );
+      rawBody,
+      req.headers["x-razorpay-signature"],
+      process.env.WEBHOOK_SECRET
+    );
 
 
 
@@ -86,26 +89,44 @@ export const handleWebhook = async (req, res, next) => {
       return res.status(404).json({ error: "Subscription not found" });
     }
 
-    if(req.body.event === 'subscription.activated' || req.body.event === 'subscription.reactivated' || req.body.event === 'subscription.resumed') {
+    if (
+      body.event === "subscription.activated" ||
+      body.event === "subscription.reactivated" ||
+      body.event === "subscription.resumed"
+    ) {
       console.log("subscription activated");
-      subscription.status = 'active';
+      subscription.status = "active";
       await subscription.save();
-    const  user = await User.findById(subscription.userId);
-      if(!user){
+      const user = await User.findById(subscription.userId);
+      if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      user.maxStorageInBytes += plans.find(plan=>plan.planId===subscription.planId).storage;
+      const plan = plans.find((plan) => plan.planId === subscription.planId);
+      if (!plan) {
+        return res.status(400).json({ error: "Unknown subscription plan" });
+      }
+      user.maxStorageInBytes += plan.storage;
       await user.save();
       return res.json({ message: "Subscription activated successfully" });
     }
-    if(req.body.event === 'subscription.cancelled' || req.body.event === 'subscription.expired' || req.body.event === 'subscription.completed' || req.body.event === 'subscription.halted' || req.body.event === 'subscription.paused') {
-      subscription.status = req.body.event;
+    if (
+      body.event === "subscription.cancelled" ||
+      body.event === "subscription.expired" ||
+      body.event === "subscription.completed" ||
+      body.event === "subscription.halted" ||
+      body.event === "subscription.paused"
+    ) {
+      subscription.status = body.event;
       await subscription.save();
-     const user = await User.findById(subscription.userId);
-      if(!user){
+      const user = await User.findById(subscription.userId);
+      if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      user.maxStorageInBytes -= plans.find(plan=>plan.planId===subscription.planId).storage;
+      const plan = plans.find((plan) => plan.planId === subscription.planId);
+      if (!plan) {
+        return res.status(400).json({ error: "Unknown subscription plan" });
+      }
+      user.maxStorageInBytes -= plan.storage;
       await user.save();
       return res.json({ message: "Subscription cancelled successfully" });
     }
