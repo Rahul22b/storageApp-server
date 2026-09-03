@@ -93,7 +93,7 @@ app.post("/githubWebhook", (req, res) => {
 });
 
 app.get("/",(req,res)=>{
-return res.status(200).send("<h1>sana I love you.....</h1><p>Welcome to the Storage App API. Please refer to the documentation for usage details.</p>");
+return res.status(200).send("<h1> I love you.....</h1><p>Welcome to the Storage App API. Please refer to the documentation for usage details.</p>");
 })
 
 app.use("/directory", checkAuth, directoryRoutes);
